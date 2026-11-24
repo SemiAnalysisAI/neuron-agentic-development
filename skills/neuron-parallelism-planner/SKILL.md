@@ -152,8 +152,11 @@ A run-spec needs:
   Multi-head Latent Attention via `kv_lora_rank`, mixed sliding/global attention via
   `layer_types`, tied or untied embeddings, `max_position_embeddings`).
 - `"hardware"` — path to a hardware-constants JSON, resolved relative to the run-spec. This
-  skill ships trn2's as [references/trn2_constants.json](references/trn2_constants.json);
-  point your run-spec at it, or copy it and calibrate (see
+  skill ships trn2's as [references/trn2_constants.json](references/trn2_constants.json) and
+  trn3's as [references/trn3_constants.json](references/trn3_constants.json) (its TE and HBM
+  values are profiler-reported; its link rates are provisional, see the file's
+  `_link_bw_comment`);
+  point your run-spec at the one for your instance, or copy it and calibrate (see
   the hardware-entitlement skill's `references/microbench-calibration.md`). Every number the
   planner prints divides by these, so a stale constant is a silently wrong plan:
 - `"serving"` — `"colocated"` only (the default). Any other value raises.

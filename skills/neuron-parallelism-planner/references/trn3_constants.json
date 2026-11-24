@@ -1,0 +1,25 @@
+{
+  "_comment": "trn3.48xlarge constants for one LNC2 LOGICAL NeuronCore (two physical NeuronCore-v4s). Same schema and conventions as trn2_constants.json: TE peak and rank count follow the physical-core geometry, HBM bandwidth is the direct per-LNC2 value the profiler reports, and HBM capacity is the 144 GiB device pool divided across four LNC2 ranks. Bandwidths are bytes/s.",
+  "_provenance": "TE and HBM values were read on 2026-11-22 from the Metadata.parquet of seven hardware profiles captured at LNC2 on a trn3.48xlarge (profiler instance_type 'trn3pds98.48xlarge', neuroncore_version v4, runtime 2.35.30, neuronx-cc 2.28.7631.0, neuron-explorer 2.33.0.1039); all seven agree. They are static hardware fields, not workload measurements. Capacity and the per-device layout are from the Trainium3 architecture guide (8 NeuronCore-v4, 4 HBM stacks, 144 GiB and 4.7 TB/s per device) and match neuron-ls on the instance (16 devices x 8 physical cores x 144 GB).",
+  "_lnc2_derivation": {
+    "physical_cores_per_logical_core": 2,
+    "logical_cores_per_device": 4,
+    "te_peak_flops_per_physical_core": 79000000000000.0,
+    "hbm_bw_bytes_per_s_per_logical_core": 1178000000000.0,
+    "dma_bw_bytes_per_s_per_physical_core": 614000000000.0,
+    "physical_cores_per_node": 128
+  },
+  "_te_comment": "Metadata.parquet reports a 128x128 Tensor Engine at 2.4 GHz and num_physical_cores=2 for LNC2: 128 * 128 * 2 FLOP/MAC * 2.4e9 * 2 = 157.2864e12 FLOP/s, rounded to 158e12 as in the trn2 file. This is the dense BF16/FP16/TF32 rate; the architecture guide gives 79 TFLOPS per NeuronCore-v4 for it. MXFP8/MXFP4 matmuls run at 4x that (315 TFLOPS per NeuronCore-v4), so a run-spec that models MX weights with compute_precision 'fp8' should set fp8_te_peak_multiplier to 4.0 on trn3 instead of the 2.0 default, which is trn2's double-FP8 mode.",
+  "_capacity_comment": "Trainium3 provides 144 GiB of HBM per device. LNC2 exposes four logical ranks per device, so the per-rank budget is 144 GiB / 4 = 36 GiB = 38654705664 bytes. HBM capacity is not a per-physical-core property.",
+  "_hbm_bw_comment": "Metadata.parquet reports hbm_ddr_bandwidth=1178 GB/s directly for an LNC2 logical rank, which is one of the device's four HBM stacks (4.7 TB/s / 4). Do not derive it by doubling a physical-core value: the two physical cores expose 2 x 614 GB/s of DMA, above the 1178 GB/s the shared HBM stack delivers.",
+  "_link_bw_comment": "PROVISIONAL, not hardware-certified. The link rates feed only the planner's analytical collective diagnostic and are outside the certified TE/HBM component floor. Metadata.parquet has no link-bandwidth field. The within-node value is the highest bus_bandwidth neuron-explorer reported for a large collective in the CcOp tables of the same seven trn3 profiles (a 42 MB Mesh reduce-scatter, 524 GB/s; large RDH all-gathers reached 429 GB/s). Those collectives ran across devices in rings of 8 and 12 ranks; a TP group that fits on one device (TP4 at LNC2) never crosses a NeuronLink, so recalibrate this from a capture of the workload being planned before trusting a collective term. The same tables show a latency floor of about 6 to 18 microseconds for collectives of 2 KB or less. The cross-node value is carried over from trn2 unmeasured; no term of the current single-node cost model reads it.",
+  "_topology_comment": "neuron-ls on trn3.48xlarge lists four connected devices for each of the 16 devices, a 4x4 torus inside the node, so TP/CP rings map to mesh axes as on trn2. Nodes of an UltraServer are joined through a switch (profiler ultraserver_type 'Switch'), which the single-node planner does not model.",
+  "te_peak_flops": 158000000000000.0,
+  "hbm_bw_bytes_per_s": 1178000000000.0,
+  "link_bw_within_node_bytes_per_s": 520000000000.0,
+  "link_bw_cross_node_bytes_per_s": 400000000000.0,
+  "cores_per_node": 64,
+  "hbm_capacity_bytes_per_core": 38654705664,
+  "topology": "torus",
+  "lnc": 2
+}

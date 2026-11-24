@@ -11,7 +11,8 @@ ground-truthed by reconciliation; the constants come from a hardware spec sheet 
 reflect what a real kernel achieves. Microbenchmarking calibrates them.
 
 **The file you are calibrating** is the parallelism-planner skill's
-`references/trn2_constants.json` -- the single canonical copy. This skill does not ship its own:
+`references/trn2_constants.json`, or `references/trn3_constants.json` on Trainium3 -- the single
+canonical copy for each instance generation. This skill does not ship its own:
 it imports the planner's analytic engine, and the same file feeds every floor either skill
 reports, so there is one file to calibrate, not two that can drift. Calibrate by editing that
 copy (or, for a one-off, copy it beside your inputs and point at the copy).

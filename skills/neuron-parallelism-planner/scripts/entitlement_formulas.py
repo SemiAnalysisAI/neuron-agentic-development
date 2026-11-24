@@ -237,7 +237,8 @@ class HW:
     # Number of LOGICAL NeuronCores/ranks exposed by the instance.
     cores_per_node: int
     # HBM capacity PER LOGICAL NeuronCore, in bytes. Generation-specific:
-    # trn1 = 16 GiB, trn2 = 24 GiB (96 GiB/device / 4 LNC2 ranks), trn3 = 144 GiB.
+    # trn1 = 16 GiB, trn2 = 24 GiB (96 GiB/device / 4 LNC2 ranks), trn3 = 36 GiB
+    # (144 GiB/device / 4 LNC2 ranks).
     # This is the per-device memory budget the sweep's fit / max-feasible-batch
     # filters charge against. Defaults to 16 GiB to keep older flat configs valid.
     hbm_capacity_bytes_per_core: float = 16 * 1024**3
@@ -866,7 +867,8 @@ def arch_from_hf(hf: dict) -> Arch:
 
 
 def load_hardware(json_path: str) -> HW:
-    """Load the trn2 hardware-constants file (Spike S2 output). Raises on TODOs."""
+    """Load a hardware-constants file (references/trn2_constants.json or trn3_constants.json).
+    Raises on TODOs."""
     with open(json_path) as f:
         raw = json.load(f)
     todos = [k for k, v in raw.items()
