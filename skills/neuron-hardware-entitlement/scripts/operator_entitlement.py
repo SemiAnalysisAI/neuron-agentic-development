@@ -70,6 +70,7 @@ from planner.activation import (  # noqa: E402
     ATTN_OPS,
     COMPONENT_BOUNDARY,
     MLA_ATTN_OPS,
+    attn_ops_of,
     PER_OPERATOR,
     act_io_elems as _shared_act_io_elems,
     group_of_layer as _ordered_group_of_layer,
@@ -299,7 +300,7 @@ def build_op_rows(arch, hw, cfg):
         dense_fc, dense_wb = f"OracleModel.layers.{i}.dense", f"layers.{i}.dense"
         moe_fc, moe_wb = f"OracleModel.layers.{i}.moe", f"layers.{i}.moe"
 
-        attn_ops = MLA_ATTN_OPS if g.mla is not None else ATTN_OPS
+        attn_ops = attn_ops_of(g)
         for op in attn_ops:
             if (op == "v_proj" and arch.attention_k_eq_v
                     and g.kv_seq_cap is None and g.mla is None):

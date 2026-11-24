@@ -135,9 +135,13 @@ class _OracleMLA(nn.Module):
         self.n_q = g.n_q_heads
         self.kv_cap = g.kv_seq_cap
 
-        self.q_a_proj = nn.Linear(a.hidden_size, m.q_lora_rank, bias=False)
-        self.q_a_norm = nn.RMSNorm(m.q_lora_rank, eps=1e-6)
-        self.q_b_proj = nn.Linear(m.q_lora_rank, self.n_q * m.qk_head_dim, bias=False)
+        if m.q_lora_rank is None:
+            # no low-rank query (DeepSeek-V2-Lite): one direct projection, named as GQA's
+            self.q_proj = nn.Linear(a.hidden_size, self.n_q * m.qk_head_dim, bias=False)
+        else:
+            self.q_a_proj = nn.Linear(a.hidden_size, m.q_lora_rank, bias=False)
+            self.q_a_norm = nn.RMSNorm(m.q_lora_rank, eps=1e-6)
+            self.q_b_proj = nn.Linear(m.q_lora_rank, self.n_q * m.qk_head_dim, bias=False)
         self.kv_a_proj = nn.Linear(a.hidden_size, m.kv_cache_dim, bias=False)
         self.kv_a_norm = nn.RMSNorm(m.kv_lora_rank, eps=1e-6)
         self.kv_b_proj = nn.Linear(m.kv_lora_rank, self.n_q * (m.qk_nope_head_dim + m.v_head_dim), bias=False)
@@ -148,7 +152,10 @@ class _OracleMLA(nn.Module):
         m = self.m
         eff_ctx = S if self.kv_cap is None else min(S, self.kv_cap)
 
-        q = self.q_b_proj(self.q_a_norm(self.q_a_proj(hidden)))
+        if m.q_lora_rank is None:
+            q = self.q_proj(hidden)
+        else:
+            q = self.q_b_proj(self.q_a_norm(self.q_a_proj(hidden)))
         q = q.view(bs, q_len, self.n_q, m.qk_head_dim).transpose(1, 2)
 
         kv_a = self.kv_a_proj(hidden)

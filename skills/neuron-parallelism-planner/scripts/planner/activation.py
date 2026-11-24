@@ -32,6 +32,15 @@ ACTIVATION_IO_POLICIES = (COMPONENT_BOUNDARY, PER_OPERATOR)
 
 ATTN_OPS = ("q_proj", "k_proj", "v_proj", "o_proj")
 MLA_ATTN_OPS = ("q_a_proj", "q_b_proj", "kv_a_proj", "kv_b_proj", "o_proj")
+# MLA without a low-rank query (q_lora_rank None, as in DeepSeek-V2-Lite): one direct q_proj.
+MLA_DIRECT_Q_ATTN_OPS = ("q_proj", "kv_a_proj", "kv_b_proj", "o_proj")
+
+
+def attn_ops_of(g):
+    """The attention projection operators of group ``g``, in the oracle's module names."""
+    if g.mla is None:
+        return ATTN_OPS
+    return MLA_DIRECT_Q_ATTN_OPS if g.mla.q_lora_rank is None else MLA_ATTN_OPS
 MLP_OPS = ("gate_proj", "up_proj", "down_proj")
 MOE_PREFIX = "moe_"
 
@@ -200,9 +209,10 @@ def act_io_elems(op_name, arch, g, cfg: ShardConfig, regime: str, inter=None):
 
     if g.mla is not None:
         m = g.mla
+        q_table = ({"q_proj": (H, q_heads)} if m.q_lora_rank is None else
+                   {"q_a_proj": (H, m.q_lora_rank), "q_b_proj": (m.q_lora_rank, q_heads)})
         table = {
-            "q_a_proj": (H, m.q_lora_rank),
-            "q_b_proj": (m.q_lora_rank, q_heads),
+            **q_table,
             "kv_a_proj": (H, m.kv_cache_dim),
             "kv_b_proj": (m.kv_lora_rank, mla_kv_b_heads),
             "o_proj": (v_heads, H),
@@ -398,7 +408,7 @@ def _per_operator_instances(arch, cfg: ShardConfig, op):
     for layer, (_gi, g) in enumerate(ordered):
         attn_in = 0.0
         attn_out = 0.0
-        attn_ops = MLA_ATTN_OPS if g.mla is not None else ATTN_OPS
+        attn_ops = attn_ops_of(g)
         for op_name in attn_ops:
             if (op_name == "v_proj" and arch.attention_k_eq_v
                     and g.kv_seq_cap is None and g.mla is None):

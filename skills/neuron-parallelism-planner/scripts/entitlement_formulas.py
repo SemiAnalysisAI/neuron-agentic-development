@@ -28,7 +28,9 @@ class MLAParams:
     MLA replaces the standard Q/K/V/O projections with a low-rank factorization and
     caches a single compressed *latent* per token instead of per-KV-head K/V:
 
-      Q:  hidden -> q_a_proj (rank q_lora_rank) -> q_b_proj (n_heads * qk_head_dim)
+      Q:  hidden -> q_a_proj (rank q_lora_rank) -> q_b_proj (n_heads * qk_head_dim),
+          or, when the checkpoint has no low-rank query (q_lora_rank null, as in
+          DeepSeek-V2-Lite), hidden -> q_proj (n_heads * qk_head_dim) directly
       KV: hidden -> kv_a_proj (kv_lora_rank + qk_rope_head_dim) -> kv_b_proj
           (n_heads * (qk_nope_head_dim + v_head_dim))
       O:  (n_heads * v_head_dim) -> hidden
@@ -37,7 +39,7 @@ class MLAParams:
     RoPE key -- so cached bytes/token/layer = (kv_lora_rank + qk_rope_head_dim), NOT
     2 * n_kv_heads * head_dim. qk_head_dim = qk_nope_head_dim + qk_rope_head_dim.
     """
-    q_lora_rank: int
+    q_lora_rank: Optional[int]
     kv_lora_rank: int
     qk_nope_head_dim: int
     qk_rope_head_dim: int
@@ -297,16 +299,20 @@ def weights_attn(a: Arch, g: AttnGroup) -> int:
     """Params in one attention block of group `g`.
 
     GQA/MHA: Q + (K,V) + O projections. MLA: the low-rank factorization
-    (q_a + q_b + kv_a + kv_b + o), which is the checkpoint's actual weight set.
+    (q_a + q_b + kv_a + kv_b + o), which is the checkpoint's actual weight set; with no
+    low-rank query (q_lora_rank None) the query is one direct q_proj instead of q_a + q_b.
     """
     if g.mla is not None:
         m = g.mla
-        q_a = a.hidden_size * m.q_lora_rank
-        q_b = m.q_lora_rank * g.n_q_heads * m.qk_head_dim
+        if m.q_lora_rank is None:
+            q = a.hidden_size * g.n_q_heads * m.qk_head_dim
+        else:
+            q = (a.hidden_size * m.q_lora_rank
+                 + m.q_lora_rank * g.n_q_heads * m.qk_head_dim)
         kv_a = a.hidden_size * m.kv_cache_dim
         kv_b = m.kv_lora_rank * g.n_q_heads * (m.qk_nope_head_dim + m.v_head_dim)
         o = g.n_q_heads * m.v_head_dim * a.hidden_size
-        return q_a + q_b + kv_a + kv_b + o
+        return q + kv_a + kv_b + o
     q = a.hidden_size * g.n_q_heads * g.head_dim
     kv = 2 * a.hidden_size * g.n_kv_heads * g.head_dim
     o = g.n_q_heads * g.head_dim * a.hidden_size
@@ -775,7 +781,7 @@ def arch_from_hf(hf: dict) -> Arch:
     mla = None
     if tc.get("kv_lora_rank") is not None:
         mla = MLAParams(
-            q_lora_rank=tc["q_lora_rank"],
+            q_lora_rank=tc.get("q_lora_rank"),
             kv_lora_rank=tc["kv_lora_rank"],
             qk_nope_head_dim=tc["qk_nope_head_dim"],
             qk_rope_head_dim=tc["qk_rope_head_dim"],
